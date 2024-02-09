@@ -68,6 +68,7 @@ import argparse
 import re # na praci s regulernimi vyrazy
 import sys
 from enum import Enum
+import xml.etree.ElementTree as ET
 
 class ErrorCode(Enum):
     PARAMETER_ERR = 10
@@ -101,6 +102,9 @@ class ArgType(Enum):
     TYPE = 4
 
 instructionDict = {
+    #Header instruction
+    ".IPPCODE24": [],
+
     # Basic instructions
     "MOVE": [ArgType.VARIABLE, ArgType.SYMBOL],
     "CREATEFRAME": [],
@@ -166,7 +170,7 @@ def main():
     parser.parse_args()
 
     source_code = sys.stdin.read()
-    lex_analysis(source_code)
+    lex_analysis(strip_comments(source_code))
     
 
 def lex_analysis(source_code):
@@ -174,13 +178,30 @@ def lex_analysis(source_code):
 
     for line_number, line in enumerate(source_code.splitlines(), start=1):
         #print(f"Working on line {line_number}:", line.strip())
+        tokens = line.split()
+        #print("Tokens:", tokens)
 
         if(line_number == 1 and line.upper().strip() != ".IPPCODE24"):
             print_error_and_exit(ErrorCode.MISSING_OR_WRONG_IPPCODE_HEADER)
 
+        else:
+            #skip empty lines
+            if len(tokens) == 0: continue
+                
+            if tokens[0].upper() in instructionDict:
+                print("Instruction:", tokens[0].upper())
+                print("Arguments:", tokens[1:])
+                print("Expected arguments:", instructionDict[tokens[0].upper()])
+            else:
+                print_error_and_exit(ErrorCode.UNKNOWN_OPCODE)
 
-        tokens = line.split()
-        print("Tokens:", tokens)
+
+
+
+
+def strip_comments(source_code):
+    """The function strips comments from the input source code"""  
+    return re.sub(r"#.*", "", source_code)
 
 
 
