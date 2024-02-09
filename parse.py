@@ -57,18 +57,13 @@
 #  </instruction>
 
 
-# POSTUP
-# Krok 1: Zajistit spravne parsovani argumentu a praci s argumenty - DONE
-# Krok 2: "Tokenizovat" zdrojovy kod
-# Krok 3: Vytvorit regexy pro matchovani lexikalnich/syntaktickych pravidel
-# Krok 4: Zajistit, aby se za behu generoval XML output
-# Krok 5: Vratit XML output pokud vse probehne jak ma
-
 import argparse
 import re # na praci s regulernimi vyrazy
 import sys
 from enum import Enum
 import xml.etree.ElementTree as ET
+
+# Helper classes
 
 class ErrorCode(Enum):
     PARAMETER_ERR = 10
@@ -79,27 +74,13 @@ class ErrorCode(Enum):
     OTHER_LEXICAL_OR_SYNTACTICAL_ERR = 23
     INTERNAL_ERR = 99
 
-def print_error_and_exit(error_code):
-      error_messages = {
-        ErrorCode.PARAMETER_ERR: "Error: missing script parameter or invalid combination of parameters used",
-        ErrorCode.INPUT_FILE_ERR: "Error: failed to open input file",
-        ErrorCode.OUTPUT_FILE_ERR: "Error: failed to open output file",
-        ErrorCode.MISSING_OR_WRONG_IPPCODE_HEADER: "Error: missing or wrong IPPcode24 header in source code",
-        ErrorCode.UNKNOWN_OPCODE: "Error: unknown opcode in source code",
-        ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR: "Error: other lexical or syntactical error detected",
-        ErrorCode.INTERNAL_ERR: "Error: internal error"
-      }
-      
-      error_message = error_messages.get(error_code)
-      if error_message:
-        print(error_message, file=sys.stderr)
-        sys.exit(error_code.value)
-
 class ArgType(Enum):
     VARIABLE = 1
     SYMBOL = 2
     LABEL = 3
     TYPE = 4
+
+# Helper dictionaries
 
 instructionDict = {
     #Header instruction
@@ -156,7 +137,17 @@ instructionDict = {
     "DPRINT": [ArgType.SYMBOL],
     "BREAK": []
 }
-    
+
+attributesRegexDict = {
+    "var_regex:" : r"^(GF|LF|TF)@[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$",
+    "label_regex:" : r"^[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$",
+    "type_regex:" : r"^(int|string|bool)$",
+    "string_regex:" : r"^([^\\\s#]|\\[0-9]{3})+$",
+    "int_regex:" : r"^[+-]?\d+$",
+    "bool_regex:" : r"^(true|false)$",
+    "nil_regex:" : r"^nil@nil$"   
+}
+
 def main():
     """The main function"""
 
@@ -169,42 +160,66 @@ def main():
                                                 "program to the standard output.")
     parser.parse_args()
 
-    source_code = sys.stdin.read()
-    lex_analysis(strip_comments(source_code))
+    source_code = sys.stdin.read() # read the source code from the standard input
+    xml_tree_root = ET.Element("program", language = "IPPcode24") # create the root element of the XML tree
+
+    run_analysis(prepare_source(source_code), xml_tree_root)
+
+    ET.indent(xml_tree_root) # indent the XML tree
+    tree = ET.ElementTree(xml_tree_root)
+    tree.write('tree.xml', encoding="unicode", xml_declaration=True) # print the XML tree to the standard output
+    return 0
     
 
-def lex_analysis(source_code):
-    """The function performs lexical analysis of the source code"""
+def run_analysis(source_code, xml_tree):
+    """The function performs lexical analysis of the source code and generates XML elements for the instructions."""
 
-    for line_number, line in enumerate(source_code.splitlines(), start=1):
-        #print(f"Working on line {line_number}:", line.strip())
+    for line_number, line in enumerate(source_code.splitlines(), start=0):
+        print(f"Working on line {line_number}:", line.strip())
         tokens = line.split()
         #print("Tokens:", tokens)
 
-        if(line_number == 1 and line.upper().strip() != ".IPPCODE24"):
+        if(line_number == 0 and line.upper().strip() != ".IPPCODE24"):
             print_error_and_exit(ErrorCode.MISSING_OR_WRONG_IPPCODE_HEADER)
 
         else:
-            #skip empty lines
-            if len(tokens) == 0: continue
+            #skip empty lines and the header
+            if len(tokens) == 0 or line_number == 0 : continue
                 
             if tokens[0].upper() in instructionDict:
-                print("Instruction:", tokens[0].upper())
-                print("Arguments:", tokens[1:])
-                print("Expected arguments:", instructionDict[tokens[0].upper()])
+                # add instruction to the XML tree
+                instruction = ET.SubElement(xml_tree, "instruction", order=str(line_number), opcode=tokens[0].upper())
+
+                # check if the number of arguments is correct and solve arguments if yes, use regex for matching
+                if len(tokens) - 1 != len(instructionDict[tokens[0].upper()]):
+                    print_error_and_exit(ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR)
+                    
+
+
             else:
                 print_error_and_exit(ErrorCode.UNKNOWN_OPCODE)
 
+def prepare_source(source_code):
+    """The function strips comments from the input source code and gets rid of empty lines."""  
+    comment_stripped = re.sub(r"#.*", "", source_code) # strip comments
 
-
-
-
-def strip_comments(source_code):
-    """The function strips comments from the input source code"""  
-    return re.sub(r"#.*", "", source_code)
-
-
-
-    
+    non_empty_lines = [line for line in comment_stripped.splitlines() if line.strip()]
+    return '\n'.join(non_empty_lines) # return the source code without comments and empty lines
+        
+def print_error_and_exit(error_code):
+      error_messages = {
+        ErrorCode.PARAMETER_ERR: "Error: missing script parameter or invalid combination of parameters used",
+        ErrorCode.INPUT_FILE_ERR: "Error: failed to open input file",
+        ErrorCode.OUTPUT_FILE_ERR: "Error: failed to open output file",
+        ErrorCode.MISSING_OR_WRONG_IPPCODE_HEADER: "Error: missing or wrong IPPcode24 header in source code",
+        ErrorCode.UNKNOWN_OPCODE: "Error: unknown opcode in source code",
+        ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR: "Error: other lexical or syntactical error detected",
+        ErrorCode.INTERNAL_ERR: "Error: internal error"
+      }
+      
+      error_message = error_messages.get(error_code)
+      if error_message:
+        print(error_message, file=sys.stderr)
+        sys.exit(error_code.value)
 
 main()
