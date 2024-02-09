@@ -58,8 +58,8 @@
 
 
 # POSTUP
-# Krok 1: Zajistit spravne parsovani argumentu a praci s argumenty
-# Krok 2: Tokenizovat zdrojovy kod
+# Krok 1: Zajistit spravne parsovani argumentu a praci s argumenty - DONE
+# Krok 2: "Tokenizovat" zdrojovy kod
 # Krok 3: Vytvorit regexy pro matchovani lexikalnich/syntaktickych pravidel
 # Krok 4: Zajistit, aby se za behu generoval XML output
 # Krok 5: Vratit XML output pokud vse probehne jak ma
@@ -93,7 +93,65 @@ def print_error_and_exit(error_code):
       if error_message:
         print(error_message, file=sys.stderr)
         sys.exit(error_code.value)
-  
+
+class ArgType(Enum):
+    VARIABLE = 1
+    SYMBOL = 2
+    LABEL = 3
+    TYPE = 4
+
+instructionDict = {
+    # Basic instructions
+    "MOVE": [ArgType.VARIABLE, ArgType.SYMBOL],
+    "CREATEFRAME": [],
+    "PUSHFRAME": [],
+    "POPFRAME": [],
+    "DEFVAR": [ArgType.VARIABLE],
+    "CALL": [ArgType.LABEL],
+    "RETURN": [],
+    
+    # Stack instructions
+    "PUSHS": [ArgType.SYMBOL],
+    "POPS": [ArgType.VARIABLE],
+
+    # Arithmetic, relational, boolean and conversion instructions
+    "ADD": [ArgType.VARIABLE, ArgType.SYMBOL, ArgType.SYMBOL],
+    "SUB": [ArgType.VARIABLE, ArgType.SYMBOL, ArgType.SYMBOL],
+    "MUL": [ArgType.VARIABLE, ArgType.SYMBOL, ArgType.SYMBOL],
+    "IDIV": [ArgType.VARIABLE, ArgType.SYMBOL, ArgType.SYMBOL],
+    "LT": [ArgType.VARIABLE, ArgType.SYMBOL, ArgType.SYMBOL],
+    "GT": [ArgType.VARIABLE, ArgType.SYMBOL, ArgType.SYMBOL],
+    "EQ": [ArgType.VARIABLE, ArgType.SYMBOL, ArgType.SYMBOL],
+    "AND": [ArgType.VARIABLE, ArgType.SYMBOL, ArgType.SYMBOL],
+    "OR": [ArgType.VARIABLE, ArgType.SYMBOL, ArgType.SYMBOL],
+    "NOT": [ArgType.VARIABLE, ArgType.SYMBOL],
+    "INT2CHAR": [ArgType.VARIABLE, ArgType.SYMBOL],
+    "STRI2INT": [ArgType.VARIABLE, ArgType.SYMBOL, ArgType.SYMBOL],
+
+    # Input/output instructions
+    "READ": [ArgType.VARIABLE, ArgType.TYPE],
+    "WRITE": [ArgType.SYMBOL],
+
+    # String instructions
+    "CONCAT": [ArgType.VARIABLE, ArgType.SYMBOL, ArgType.SYMBOL],
+    "STRLEN": [ArgType.VARIABLE, ArgType.SYMBOL],
+    "GETCHAR": [ArgType.VARIABLE, ArgType.SYMBOL, ArgType.SYMBOL],
+    "SETCHAR": [ArgType.VARIABLE, ArgType.SYMBOL, ArgType.SYMBOL],
+
+    # Type instructions
+    "TYPE": [ArgType.VARIABLE, ArgType.SYMBOL],
+
+    # Flow control instructions
+    "LABEL": [ArgType.LABEL],
+    "JUMP": [ArgType.LABEL],
+    "JUMPIFEQ": [ArgType.LABEL, ArgType.SYMBOL, ArgType.SYMBOL],
+    "JUMPIFNEQ": [ArgType.LABEL, ArgType.SYMBOL, ArgType.SYMBOL],
+    "EXIT": [ArgType.SYMBOL],
+
+    # Debug instructions
+    "DPRINT": [ArgType.SYMBOL],
+    "BREAK": []
+}
     
 def main():
     """The main function"""
@@ -107,17 +165,24 @@ def main():
                                                 "program to the standard output.")
     parser.parse_args()
 
-    if(len(sys.argv) == 1):
-        print_error_and_exit(ErrorCode.INPUT_FILE_ERR)
-    else:
-        source_code = sys.stdin.read()
-        lex_analysis(source_code)
+    source_code = sys.stdin.read()
+    lex_analysis(source_code)
     
 
 def lex_analysis(source_code):
-    print(source_code)
-    for line in source_code.splitlines():
-        print("Working on line:", line.strip())
+    """The function performs lexical analysis of the source code"""
+
+    for line_number, line in enumerate(source_code.splitlines(), start=1):
+        #print(f"Working on line {line_number}:", line.strip())
+
+        if(line_number == 1 and line.upper().strip() != ".IPPCODE24"):
+            print_error_and_exit(ErrorCode.MISSING_OR_WRONG_IPPCODE_HEADER)
+
+
+        tokens = line.split()
+        print("Tokens:", tokens)
+
+
 
     
 
