@@ -4,14 +4,6 @@
 
 # Dev notes:
 # - Skript nesmi spoustet zadne dalsi procesy ci prikazy operacniho systemy
-# - Veskera chybova hlaseni, varovani a ladici vypisy smeruji na stderr, jinak nedodrzeni zadani
-# - Skript ktery dobehne bez chyby vraci 0
-# - Skript ktery neprobehne bez chyby vraci chyby nasledovne:
-#   10 - chubejici parametr skriptu (je-li treba) nebo pouziti nedovolene kombinace parametru
-#   11 - chyba pri otevirani vstupnich souboru (neexistence, nedostacujici opravneni atd atd)
-#   12 - chyba pri otevirani vystypnich soboru pro zapis (nedostacujici opravneni, chyba pri zapisu atd atd)
-#   20 az 69 - navratove kody chyb specifickych pro jednotlive skripty 
-#   99 - interni chyba (neovlivnena integraci, vstupnimi soubory nebo paramery CLI)
 # - Veskere vstupy a vystupy v kodovani UTF-8 LC_ALL=cs_CZ.UTF-8
 # - Pomocne skripty nebo knihovny povoleny, pripona dle zvyklosti v prg jazyce
 # Predinstalovane knihovny povolene, jine je nutne konzultovat
@@ -41,20 +33,6 @@
 # 22 - neznamy nebo chybny operacni kod ve zdrojovem kodu napsanem v IPPcode24
 # 23 - jina lexikalni nebo sytakticka chuba zdrojoveho kodu zapsaneho v IPPcode24
 #---------------------------------------#
-
-# XML snippet
-#<?xml version="1.0" encoding="utf-8"?>
-#<program language="IPPcode21">
-  #<instruction order="1" opcode="DEFVAR">
-   # <arg1 type="var">GF@counter</arg1>
-  #</instruction>
-  #<instruction order="2" opcode="MOVE">
-   # <arg1 type="var">GF@counter</arg1>
-  #  <arg2 type="string"/>
- # </instruction>
-#  <instruction order="3" opcode="LABEL">
-#    <arg1 type="label">while</arg1>
-#  </instruction>
 
 
 import re # na praci s regulernimi vyrazy
@@ -138,21 +116,25 @@ instructionDict = {
 }
 
 attributesRegexDict = {
-    "var_regex:" : r"^(GF|LF|TF)@[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$",
-    "label_regex:" : r"^[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$",
-    "type_regex:" : r"^(int|string|bool)$",
-    "string_regex:" : r"^([^\\\s#]|\\[0-9]{3})+$",
-    "int_regex:" : r"^[+-]?\d+$",
-    "bool_regex:" : r"^(true|false)$",
-    "nil_regex:" : r"^nil@nil$"   
+    "var_regex" : r"^(GF|LF|TF)@[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$",
+    "label_regex" : r"^[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$",
+    "type_regex" : r"^(int|string|bool)$",
+    "string_regex" : r"^string@(?:[^\\\s#]|\\[0-9]{3})+$",
+    "int_regex" : r"^int@([+-]?\d+)$",
+    "bool_regex" : r"^bool@(true|false)$",
+    "nil_regex" : r"^nil@(nil)$"   
 }
 
 def main():
     """The main function"""
 
     parse_arguments(sys.argv)
-
     source_code = sys.stdin.read() # read the source code from the standard input
+
+    # check if stdin is empty
+    if not source_code:
+        print_error_and_exit(ErrorCode.INPUT_FILE_ERR)
+
     xml_tree_root = ET.Element("program", language = "IPPcode24") # create the root element of the XML tree
 
     run_analysis(prepare_source(source_code), xml_tree_root)
@@ -160,16 +142,16 @@ def main():
     ET.indent(xml_tree_root) # indent the XML tree
     tree = ET.ElementTree(xml_tree_root)
     tree.write('tree.xml', encoding="unicode", xml_declaration=True) # print the XML tree to the standard output
-    return 0
+    sys.exit(0)
     
 
 def run_analysis(source_code, xml_tree):
     """The function performs lexical analysis of the source code and generates XML elements for the instructions."""
 
     for line_number, line in enumerate(source_code.splitlines(), start=0):
-        print(f"Working on line {line_number}:", line.strip())
+        # split the line into seperate tokens
         tokens = line.split()
-        #print("Tokens:", tokens)
+        print(f"Tokens on line {line_number}:", tokens) # just for debugging
 
         if(line_number == 0 and line.upper().strip() != ".IPPCODE24"):
             print_error_and_exit(ErrorCode.MISSING_OR_WRONG_IPPCODE_HEADER)
@@ -184,10 +166,58 @@ def run_analysis(source_code, xml_tree):
 
                 # check if the number of arguments is correct and solve arguments if yes, use regex for matching
                 if len(tokens) - 1 != len(instructionDict[tokens[0].upper()]):
+                    print(instructionDict[tokens[0].upper()])
                     print_error_and_exit(ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR)
-                    
+                else:
+                    # cross check aganist regexes based on what type is the argument
+                    # first check the argtype, then check the regex
+                    for i in range(1, len(tokens)):
+
+                        argument_type = instructionDict[tokens[0].upper()][i-1]	# get type of argument
+                        
+                        # get literal value of argument
+                        split_index = tokens[i].find("@")
+                        if split_index != -1:
+                            literal_value = tokens[i][split_index+1:]
+                        else:
+                            literal_value = tokens[i]
 
 
+                        if argument_type == ArgType.VARIABLE:
+
+                            if not re.match(attributesRegexDict["var_regex"], tokens[i]):
+                                print_error_and_exit(ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR)
+                            else:
+                                ET.SubElement(instruction, "arg" + str(i), type="var").text = tokens[i]
+
+                        elif argument_type == ArgType.SYMBOL:
+                            
+                            if re.match(attributesRegexDict["var_regex"], tokens[i]):
+                                ET.SubElement(instruction, "arg" + str(i), type="var").text = tokens[i]
+                            elif re.match(attributesRegexDict["int_regex"], tokens[i]):
+                                ET.SubElement(instruction, "arg" + str(i), type="int").text = literal_value
+                            elif re.match(attributesRegexDict["bool_regex"], tokens[i]):
+                                ET.SubElement(instruction, "arg" + str(i), type="bool").text = literal_value
+                            elif re.match(attributesRegexDict["nil_regex"], tokens[i]):
+                                ET.SubElement(instruction, "arg" + str(i), type="nil").text = literal_value
+                            elif re.match(attributesRegexDict["string_regex"], tokens[i]):
+                                ET.SubElement(instruction, "arg" + str(i), type="string").text = literal_value
+                            else:
+                                print_error_and_exit(ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR)
+
+                        elif argument_type == ArgType.LABEL:
+
+                            if not re.match(attributesRegexDict["label_regex"], tokens[i]):
+                                print_error_and_exit(ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR)
+                            else:
+                                ET.SubElement(instruction, "arg" + str(i), type="label").text = tokens[i]
+
+                        elif argument_type == ArgType.TYPE:
+
+                            if not re.match(attributesRegexDict["type_regex"], tokens[i]):
+                                print_error_and_exit(ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR)
+                            else:
+                                ET.SubElement(instruction, "arg" + str(i), type="type").text = literal_value
             else:
                 print_error_and_exit(ErrorCode.UNKNOWN_OPCODE)
 
