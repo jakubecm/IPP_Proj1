@@ -1,41 +1,13 @@
 # @Author Milan Jakubec, 2 BIT FIT VUT
 # @Date 7.2. 2024
 # @file parse.py
+# @brief IPPcode24 parser, loads source code from standard input, checks lexical and syntactic correctness and prints XML representation of the program to standard output
 
 # Dev notes:
-# - Skript nesmi spoustet zadne dalsi procesy ci prikazy operacniho systemy
+# - Skript nesmi spoustet zadne dalsi procesy ci prikazy operacniho systemu
 # - Veskere vstupy a vystupy v kodovani UTF-8 LC_ALL=cs_CZ.UTF-8
-# - Pomocne skripty nebo knihovny povoleny, pripona dle zvyklosti v prg jazyce
-# Predinstalovane knihovny povolene, jine je nutne konzultovat
-# Doporucene naprogramovat si vlastni testy
-# Pro navrat chyboveho kodu pouzivat sys.exit, ne return
-# Rozparsovat vstup do XML stromu
-# Při tvorbě analyzátoru doporučujeme kombinovat konečně-stavové řízení a regulární výrazy a pro generování výstupního XML využít vhodnou knihovnu.
 
-# ------------- PARAMETRY ------------- #
-# Obecne kombinovatelne parametry skriptu jsou oddelene aspon jednim whitespacem a pokud neni receno jinak, mohou byt v libovolnem poradi.
-# Testovane vzdy budou dlouhe verze parametru, nicmene je mozne implementovat zastupne zkracene (jedna pomlcka) parametry
-# Je-li soucasti parametru i soubor (pr. --source=file nebo --source="file") anebo cesta, muze byt ten soubor/cesta zadany relativni cestou nebo absolutni cestou,
-# vyskyt znaku uvozovek nemusime uvazovat, stejne tak rovnitko. Cesty/jmena souboru mohou obsahovat Unicode UTF-8 znaky.
-#
-# --help : Vypise na standartni vystup napovedu skriptu (nenacita vstup), napovedu lze prevzit ze zadani a vrati 0.
-#          Help nelze kombinovat s zadnym dalsi parametrem, jinak skript vraci 10.
-#
-# -------------------------------------#
-
-#------- POPIS FUNKCE -------#
-# - Nacte ze standartniho vstupu zdrojovy kod v IPP-Code24, zkontroluje lexikalni a syntaktickou spravnost kodu
-# - Pokud je vse ok, vypise na standartni vystup XML reprezentaci programu dle specifikace v sekci 3.1. zadani
-#----------------------------#
-
-#------ SPECIFICKE CHYBOVE VYSTUPY -----#
-# 21 - chybna nebo chubejici hlavicka zdrojoveho kodu zapsanem v IPPcode24
-# 22 - neznamy nebo chybny operacni kod ve zdrojovem kodu napsanem v IPPcode24
-# 23 - jina lexikalni nebo sytakticka chuba zdrojoveho kodu zapsaneho v IPPcode24
-#---------------------------------------#
-
-
-import re # na praci s regulernimi vyrazy
+import re
 import sys
 from enum import Enum
 import xml.etree.ElementTree as ET
@@ -129,19 +101,19 @@ def main():
     """The main function"""
 
     parse_arguments(sys.argv)
-    source_code = sys.stdin.read() # read the source code from the standard input
+    source_code = sys.stdin.read()
 
     # check if stdin is empty
     if not source_code:
         print_error_and_exit(ErrorCode.INPUT_FILE_ERR)
 
-    xml_tree_root = ET.Element("program", language = "IPPcode24") # create the root element of the XML tree
+    xml_tree_root = ET.Element("program", language="IPPcode24")  # create the root element of the XML tree
 
     run_analysis(prepare_source(source_code), xml_tree_root)
 
-    ET.indent(xml_tree_root) # indent the XML tree
+    ET.indent(xml_tree_root)
     tree = ET.ElementTree(xml_tree_root)
-    tree.write('tree.xml', encoding="unicode", xml_declaration=True) # print the XML tree to the standard output
+    tree.write('tree.xml', encoding="unicode", xml_declaration=True)  # print the XML tree to the standard output
     sys.exit(0)
     
 
@@ -162,62 +134,15 @@ def run_analysis(source_code, xml_tree):
                 
             if tokens[0].upper() in instructionDict:
                 # add instruction to the XML tree
-                instruction = ET.SubElement(xml_tree, "instruction", order=str(line_number), opcode=tokens[0].upper())
+                xml_instruction_el = ET.SubElement(xml_tree, "instruction", order=str(line_number), opcode=tokens[0].upper())
 
                 # check if the number of arguments is correct and solve arguments if yes, use regex for matching
                 if len(tokens) - 1 != len(instructionDict[tokens[0].upper()]):
                     print(instructionDict[tokens[0].upper()])
                     print_error_and_exit(ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR)
-                else:
-                    # cross check aganist regexes based on what type is the argument
-                    # first check the argtype, then check the regex
-                    for i in range(1, len(tokens)):
 
-                        argument_type = instructionDict[tokens[0].upper()][i-1]	# get type of argument
-                        
-                        # get literal value of argument
-                        split_index = tokens[i].find("@")
-                        if split_index != -1:
-                            literal_value = tokens[i][split_index+1:]
-                        else:
-                            literal_value = tokens[i]
-
-
-                        if argument_type == ArgType.VARIABLE:
-
-                            if not re.match(attributesRegexDict["var_regex"], tokens[i]):
-                                print_error_and_exit(ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR)
-                            else:
-                                ET.SubElement(instruction, "arg" + str(i), type="var").text = tokens[i]
-
-                        elif argument_type == ArgType.SYMBOL:
-                            
-                            if re.match(attributesRegexDict["var_regex"], tokens[i]):
-                                ET.SubElement(instruction, "arg" + str(i), type="var").text = tokens[i]
-                            elif re.match(attributesRegexDict["int_regex"], tokens[i]):
-                                ET.SubElement(instruction, "arg" + str(i), type="int").text = literal_value
-                            elif re.match(attributesRegexDict["bool_regex"], tokens[i]):
-                                ET.SubElement(instruction, "arg" + str(i), type="bool").text = literal_value
-                            elif re.match(attributesRegexDict["nil_regex"], tokens[i]):
-                                ET.SubElement(instruction, "arg" + str(i), type="nil").text = literal_value
-                            elif re.match(attributesRegexDict["string_regex"], tokens[i]):
-                                ET.SubElement(instruction, "arg" + str(i), type="string").text = literal_value
-                            else:
-                                print_error_and_exit(ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR)
-
-                        elif argument_type == ArgType.LABEL:
-
-                            if not re.match(attributesRegexDict["label_regex"], tokens[i]):
-                                print_error_and_exit(ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR)
-                            else:
-                                ET.SubElement(instruction, "arg" + str(i), type="label").text = tokens[i]
-
-                        elif argument_type == ArgType.TYPE:
-
-                            if not re.match(attributesRegexDict["type_regex"], tokens[i]):
-                                print_error_and_exit(ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR)
-                            else:
-                                ET.SubElement(instruction, "arg" + str(i), type="type").text = literal_value
+                else: analyse_arguments(tokens, xml_instruction_el)
+                    
             else:
                 print_error_and_exit(ErrorCode.UNKNOWN_OPCODE)
 
@@ -236,7 +161,7 @@ def print_error_and_exit(error_code):
         ErrorCode.OUTPUT_FILE_ERR: "Error: failed to open output file",
         ErrorCode.MISSING_OR_WRONG_IPPCODE_HEADER: "Error: missing or wrong IPPcode24 header in source code",
         ErrorCode.UNKNOWN_OPCODE: "Error: unknown opcode in source code",
-        ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR: "Error: other lexical or syntactical error detected",
+        ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR: "Error: lexical or syntactical error detected",
         ErrorCode.INTERNAL_ERR: "Error: internal error"
       }
       
@@ -264,5 +189,50 @@ def parse_arguments(args):
             return 0
         else:
             print_error_and_exit(ErrorCode.PARAMETER_ERR)
+
+def analyse_arguments(tokens, instruction):
+    """The function analyses the arguments of the instruction and adds them to the XML tree."""
+
+    for i in range(1, len(tokens)):
+        argument_type = instructionDict[tokens[0].upper()][i-1]    # get type of argument
+
+        # get literal value of argument
+        split_index = tokens[i].find("@")
+        if split_index != -1:
+            literal_value = tokens[i][split_index+1:]
+        else:
+            literal_value = tokens[i]
+
+        if argument_type == ArgType.VARIABLE:
+            if not re.match(attributesRegexDict["var_regex"], tokens[i]):
+                print_error_and_exit(ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR)
+            else:
+                ET.SubElement(instruction, "arg" + str(i), type="var").text = tokens[i]
+
+        elif argument_type == ArgType.SYMBOL:
+            if re.match(attributesRegexDict["var_regex"], tokens[i]):
+                ET.SubElement(instruction, "arg" + str(i), type="var").text = tokens[i]
+            elif re.match(attributesRegexDict["int_regex"], tokens[i]):
+                ET.SubElement(instruction, "arg" + str(i), type="int").text = literal_value
+            elif re.match(attributesRegexDict["bool_regex"], tokens[i]):
+                ET.SubElement(instruction, "arg" + str(i), type="bool").text = literal_value
+            elif re.match(attributesRegexDict["nil_regex"], tokens[i]):
+                ET.SubElement(instruction, "arg" + str(i), type="nil").text = literal_value
+            elif re.match(attributesRegexDict["string_regex"], tokens[i]):
+                ET.SubElement(instruction, "arg" + str(i), type="string").text = literal_value
+            else:
+                print_error_and_exit(ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR)
+
+        elif argument_type == ArgType.LABEL:
+            if not re.match(attributesRegexDict["label_regex"], tokens[i]):
+                print_error_and_exit(ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR)
+            else:
+                ET.SubElement(instruction, "arg" + str(i), type="label").text = tokens[i]
+
+        elif argument_type == ArgType.TYPE:
+            if not re.match(attributesRegexDict["type_regex"], tokens[i]):
+                print_error_and_exit(ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR)
+            else:
+                ET.SubElement(instruction, "arg" + str(i), type="type").text = literal_value
 
 main()
