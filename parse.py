@@ -57,7 +57,6 @@
 #  </instruction>
 
 
-import argparse
 import re # na praci s regulernimi vyrazy
 import sys
 from enum import Enum
@@ -151,14 +150,7 @@ attributesRegexDict = {
 def main():
     """The main function"""
 
-    parser = argparse.ArgumentParser(description="Filter-type script; "
-                                                "reads the source code written in "
-                                                "IPPcode24 from the standard input, " 
-                                                "checks the lexical and syntactic "
-                                                "correctness of the code and prints "                    
-                                                "the XML representation of the "
-                                                "program to the standard output.")
-    parser.parse_args()
+    parse_arguments(sys.argv)
 
     source_code = sys.stdin.read() # read the source code from the standard input
     xml_tree_root = ET.Element("program", language = "IPPcode24") # create the root element of the XML tree
@@ -207,7 +199,8 @@ def prepare_source(source_code):
     return '\n'.join(non_empty_lines) # return the source code without comments and empty lines
         
 def print_error_and_exit(error_code):
-      error_messages = {
+    """The function prints an error message to the standard error output and exits the script with the given error code."""
+    error_messages = {
         ErrorCode.PARAMETER_ERR: "Error: missing script parameter or invalid combination of parameters used",
         ErrorCode.INPUT_FILE_ERR: "Error: failed to open input file",
         ErrorCode.OUTPUT_FILE_ERR: "Error: failed to open output file",
@@ -217,9 +210,29 @@ def print_error_and_exit(error_code):
         ErrorCode.INTERNAL_ERR: "Error: internal error"
       }
       
-      error_message = error_messages.get(error_code)
-      if error_message:
+    error_message = error_messages.get(error_code)
+    if error_message:
         print(error_message, file=sys.stderr)
         sys.exit(error_code.value)
+
+def parse_arguments(args):
+    if len(args) == 2 and args[1] in ["--help", "-h"]:
+
+        print("parse.py - IPPcode24 parser\n", file=sys.stdout)
+        print("Filter-type script; "
+            "reads the source code written in "
+            "IPPcode24 from the standard input, " 
+            "checks the lexical and syntactic "
+            "correctness of the code and prints "                    
+            "the XML representation of the "
+            "program to the standard output.\n", file=sys.stdout)
+        print("Usage: python3 parse.py < source_code.ippcode24", file=sys.stdout)
+        print("Usage: cat ippcode24_file.ippcode24 | python3 parse.py\n", file=sys.stdout)
+        return 0
+    else:
+        if len(args) == 1:
+            return 0
+        else:
+            print_error_and_exit(ErrorCode.PARAMETER_ERR)
 
 main()
