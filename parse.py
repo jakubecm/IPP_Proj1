@@ -92,7 +92,7 @@ attributesRegexDict = {
     "label_regex" : r"^[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$",
     "type_regex" : r"^(int|string|bool)$",
     "string_regex" : r"^string@(?:[^\\\s#]|\\[0-9]{3})+$",
-    "int_regex" : r"^int@([+-]?\d+)$",
+    "int_regex" : r"^int@([+-]?\d+)|(0[xX][0-9a-fA-F]+)|(0[0-7]+)$",
     "bool_regex" : r"^bool@(true|false)$",
     "nil_regex" : r"^nil@(nil)$"   
 }
@@ -113,7 +113,7 @@ def main():
 
     ET.indent(xml_tree_root)
     tree = ET.ElementTree(xml_tree_root)
-    tree.write('tree.xml', encoding="unicode", xml_declaration=True)  # print the XML tree to the standard output
+    tree.write(sys.stdout, encoding="unicode", xml_declaration=True)  # print the XML tree to the standard output
     sys.exit(0)
     
 
@@ -123,7 +123,6 @@ def run_analysis(source_code, xml_tree):
     for line_number, line in enumerate(source_code.splitlines(), start=0):
         # split the line into seperate tokens
         tokens = line.split()
-        print(f"Tokens on line {line_number}:", tokens) # just for debugging
 
         if(line_number == 0 and line.upper().strip() != ".IPPCODE24"):
             print_error_and_exit(ErrorCode.MISSING_OR_WRONG_IPPCODE_HEADER)
@@ -171,6 +170,7 @@ def print_error_and_exit(error_code):
         sys.exit(error_code.value)
 
 def parse_arguments(args):
+    """The function parses the script arguments and prints the help message if the --help or -h flag is used."""
     if len(args) == 2 and args[1] in ["--help", "-h"]:
 
         print("parse.py - IPPcode24 parser\n", file=sys.stdout)
