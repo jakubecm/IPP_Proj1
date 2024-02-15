@@ -92,7 +92,7 @@ attributesRegexDict = {
     "label_regex" : r"^[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$",
     "type_regex" : r"^(int|string|bool)$",
     "string_regex" : r"^string@(?:[^\\\s#]|\\[0-9]{3})+$",
-    "int_regex" : r"^int@(?:[+-]?\d+|0[xX][0-9a-fA-F]+|0[0-7]+)$",
+    "int_regex" : r"^int@([+-]?\d+)|(0[xX][0-9a-fA-F]+)|(0o[0-7]+)$",
     "bool_regex" : r"^bool@(true|false)$",
     "nil_regex" : r"^nil@(nil)$"   
 }
