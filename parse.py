@@ -91,7 +91,7 @@ attributesRegexDict = {
     "var_regex" : r"^(GF|LF|TF)@[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$",
     "label_regex" : r"^[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*$",
     "type_regex" : r"^(int|string|bool)$",
-    "string_regex" : r"^string@(?:[^\\\s#]|\\[0-9]{3})+$",
+    "string_regex" : r"^(string@((?:[^\\\s#]|\\[0-9]{3})+)?)$",
     "int_regex" : r"^(int@(([+-]?\d+(?!\S))|(\-?0o[0-7]+)|(-?0x[0-9a-fA-F]+)))$",
     "bool_regex" : r"^bool@(true|false)$",
     "nil_regex" : r"^nil@(nil)$"   
@@ -132,6 +132,11 @@ def run_analysis(source_code, xml_tree):
             if len(tokens) == 0 or line_number == 0 : continue
                 
             if tokens[0].upper() in instructionDict:
+
+                #if header is in the code more than once, throw error
+                if tokens[0].upper() == ".IPPCODE24":
+                    print_error_and_exit(ErrorCode.OTHER_LEXICAL_OR_SYNTACTICAL_ERR)
+
                 # add instruction to the XML tree
                 xml_instruction_el = ET.SubElement(xml_tree, "instruction", order=str(line_number), opcode=tokens[0].upper())
 
