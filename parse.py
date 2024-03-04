@@ -191,7 +191,7 @@ def parse_arguments(args):
         sys.exit(0)
     else:
         if len(args) == 1:
-            sys.exit(0)
+            return 0
         else:
             print_error_and_exit(ErrorCode.PARAMETER_ERR)
 
