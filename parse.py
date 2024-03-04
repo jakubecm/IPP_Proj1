@@ -188,10 +188,10 @@ def parse_arguments(args):
             "program to the standard output.\n", file=sys.stdout)
         print("Usage: python3 parse.py < source_code.ippcode24", file=sys.stdout)
         print("Usage: cat ippcode24_file.ippcode24 | python3 parse.py\n", file=sys.stdout)
-        return 0
+        sys.exit(0)
     else:
         if len(args) == 1:
-            return 0
+            sys.exit(0)
         else:
             print_error_and_exit(ErrorCode.PARAMETER_ERR)
 
